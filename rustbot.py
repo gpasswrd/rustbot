@@ -179,8 +179,16 @@ async def codeTest():
 async def pairingNotification(notification):
     pass
 
-class EventTracker:
+class Event:
+    def __init__(self, type:int):
+        self.type = type
+        self.previous_active = None
+        self.active = None
+        self.last_seen = None
+        self.marker = None
+        self.marker:rustplus.RustMarker
 
+class EventTracker:
     def __init__(self):
         self.type_to_name = {
             1:"Player",
@@ -192,37 +200,49 @@ class EventTracker:
             7:"GenericRadius",
             8:"Patrol Helicopter"
         }
-        self.last_seen = {}
-        self.active_events = None
-        self.active_events:list[rustplus.RustMarker]
+
+        self.monitored_events = [4, 5, 8]
+
+        self.event_dict = {type:Event(type) for type in self.type_to_name.keys()}
 
 
     async def updateEvents(self):
-        self.active_events = []
-        for event in (await rust_socket.get_current_events()):
-            if event.type in [4, 5, 8]:
-                self.last_seen[event.type] = timing.time()
-                active_events.append(event)
+        current_events = (await rust_socket.get_current_events())
 
-        if self.active_events:
-            return True
+        for event in self.event_dict.values():
+            event.previous_active = event.active
+            event.active = False
+
+        for marker in current_events:
+            if marker.type in self.monitored_events:
+                self.event_dict[marker.type].active = True
+                self.event_dict[marker.type].last_seen = timing.time()
+                self.event_dict[marker.type].marker = marker
         
-    async def sendEvents(self):
-        for event in self.active_events:
-            await send_message(f"{self.type_to_name[event.type]} has entered the map @{rustplus.convert_xy_to_grid(event.x, event.y)}.")
+        for event in self.event_dict.values():
+            if event.active == event.previous_active:
+                continue
+
+            if event.active == True:
+                await send_message(f"{self.type_to_name[event.type]} has entered the map @{rustplus.convert_xy_to_grid((event.marker.x, event.marker.y))}.")
+
+            elif event.active == False and event.type != 8:
+                await send_message(f"{self.type_to_name[event.type]} has left the map.")
+
+            else:
+                if event.type == 8:
+                    await send_message(f"Patrol Helicoper was taken down @{rustplus.convert_xy_to_grid((event.marker.x, event.marker.y))}")                        
+    
 
     async def lastSeen(self, event_type):
-        if event_type in self.last_seen.keys():
-            await send_message(f"{self.type_to_name[event_type]} was last seen {await format_seconds(timing.time-self.last_seen[event_type])} ago.")
+        if event_type in self.event_dict.keys() and self.event_dict[event_type].last_seen:
+            await send_message(f"{self.type_to_name[event_type]} was last seen {await format_seconds(timing.time-self.event_dict[event_type].last_seen)} ago.")
         else:
             await send_message(f"{self.type_to_name[event_type]} has not yet been seen.")
         
-class RustBot:
-    def __init__(self):
-        pass
 
 async def main():
-    global rust_socket, notif, paired_switches, ent_id, pairing_time, craftables, team_list
+    global rust_socket, notif, paired_switches, ent_id, pairing_time, craftables, team_list, event_tracker
 
     fcm_listener = MyFCMListener(fcm_details)
     fcm_listener.start()
@@ -245,7 +265,6 @@ async def main():
 
         await asyncio.sleep(1)
 
-
         if update_timer >= 120:
             #await update_players()
             update_timer = 0
@@ -253,8 +272,7 @@ async def main():
 
         if update_timer % 3 == 0:
             await updateTeam()
-            if (await event_tracker.updateEvents()):
-                (await event_tracker.sendEvents())
+            await event_tracker.updateEvents()
 
         if notif and ignore_notif == False:
             print("a")
@@ -287,6 +305,10 @@ async def main():
             pairing_time += 1
         if pairing_time > 90:
             pairing_time = 0
+
+@rust_socket.command
+async def heli(command:Command):
+    await event_tracker.lastSeen(8)
 
 @rust_socket.command
 async def afk(command:Command):
