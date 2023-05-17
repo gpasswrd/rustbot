@@ -19,14 +19,9 @@ with open ("crafting_recipies.json", "r") as input_file:
 class MyFCMListener(FCMListener):
     def __init__(self, fcm_details):
         super().__init__(fcm_details)
-        self.counter = 1
-        self.pairing = None
     
     def on_notification(self, obj, notification, data_message):
-        global notif
-        notif = (notification)
-        if not self.pairing:
-            self.pairing = asyncio.create_task(pairingNotification())
+        self.pairing = asyncio.create_task(pairingNotification(notification))
 
 
 
@@ -182,8 +177,8 @@ async def pairingNotification(notification):
 class Event:
     def __init__(self, type:int):
         self.type = type
-        self.previous_active = None
-        self.active = None
+        self.previous_active = False
+        self.active = False
         self.last_seen = None
         self.marker = None
         self.marker:rustplus.RustMarker
@@ -464,10 +459,10 @@ async def promote(command:Command):
 
 loop = asyncio.get_event_loop()
 while True:
-    try:
-        asyncio.run(main())
+    # try:
+    asyncio.run(main())
 
-    except Exception as e:
-        print(e)
-        timing.sleep(20)
-        continue
+    # except Exception as e:
+    #     print(e)
+    #     timing.sleep(20)
+    #     continue
