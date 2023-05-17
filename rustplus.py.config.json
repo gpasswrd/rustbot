@@ -1,0 +1,21 @@
+{
+    "expo_push_token": "ExponentPushToken[1x-eXjPbRkA63oSblCI0dg]",
+    "fcm_credentials": {
+    "fcm": {
+    "pushSet": "dAYFSFSxx9k:APA91bE_xriRI_9f6dvX_ywFVTHOAC_DicT3dvu_LiRF3eOu2VKaIJlT8m2h9tenWSi6YrvNNZQXwm8ZmFNUjnub21Luul0EDS1nPvT6ERj_3Mqopmd8jrF9LQUhuX532KM5TFYIhIR5",
+    "token": "dLNlSZguEPs:APA91bGwPi5NUPVzKm2WSqwsJGSRPjNAvoqmS0BRDmSgzhCqqwcdsK6U4VK64-gqQlnFOrozSYGBcmQp_C2FnY4tIVbdabmjDp5M9EgYA9BlVmlCMdC4KEIAKXi_mj-aD_-25-LEefJn"
+    },
+    "gcm": {
+    "androidId": "4633067340276504254",
+    "appId": "wp:receiver.push.com#33e7450c-d75f-4bea-affa-4ffe15cbadb5",
+    "securityToken": "82030940093031728",
+    "token": "c7kXU304anM:APA91bFuu8cX7enclADssMiXVezMzIKCvCs7tEzI21vuqsriUN9bt4q5eaVo8nN_KIpnXnlFVgv-R4Jt8UTzFFibY7yhZy3_MZdVWCABHNMzeL_Axl0McyviNIYWiJA1UWyTbwipRVWV"
+    },
+    "keys": {
+    "private": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQghK0EZ4P0hvL3P1oMNF-rEeqp-Rofi9rXLPtZqJaII8ahRANCAATYc45vK8NK6Llo9R_AzfAI8p7AJt3047sBeIAcZdY7ZTmrDzNp-2C1b2I1I1ugjwzagH9hM748KAPiM_7MfJoU",
+    "public": "BNhzjm8rw0rouWj1H8DN8AjynsAm3fTjuwF4gBxl1jtlOasPM2n7YLVvYjUjW6CPDNqAf2EzvjwoA-Iz_sx8mhQ",
+    "secret": "g2aZpBK4mxIrjDVjkB6UVw"
+    }
+    },
+    "rustplus_auth_token": "eyJzdGVhbUlkIjoiNzY1NjExOTkwNjg0NjA4NzMiLCJ2ZXJzaW9uIjowLCJpc3MiOjE2ODM5NTE0NjEsImV4cCI6MTY4NTE2MTA2MX0=.Clza5D2g6wUARzqkUomK/RX2lgUVBXprxjer9i806h2tXd0YcB2esqe0yg+2Vw5UMqTFVmuCIOuwzUf9hLDoDw=="
+    }
