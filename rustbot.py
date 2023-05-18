@@ -1,14 +1,17 @@
 from __future__ import annotations
 from config import *
 import asyncio
+from event_tracker import EventTracker
+from utils import *
 from rustplus import RustSocket, CommandOptions, Command, FCMListener
+from rustplus.api.structures.rust_team_info import RustTeamMember
 import rustplus
 import time as timing
 import datetime
 import json
 import re
 from player import Player
-import arrow
+import traceback
 
 with open("rustplus.py.config.json", "r") as input_file:
     fcm_details = json.load(input_file)
@@ -21,10 +24,11 @@ class MyFCMListener(FCMListener):
         super().__init__(fcm_details)
     
     def on_notification(self, obj, notification, data_message):
-        self.pairing = asyncio.create_task(pairingNotification(notification))
+        #self.pairing = asyncio.create_task(pairingNotification(notification))
+        pass
 
 
-
+task:asyncio.Task
 team_list = None
 task = None
 paired_switches = {}
@@ -48,14 +52,6 @@ async def start_pairing(notif):
     await send_message(str(message))
     pairing_time = 1
     ent_id = int(json.loads(notif["data"]["body"])["entityId"])
-
-async def format_seconds(seconds):
-    duration = arrow.now().shift(seconds=seconds)
-    if seconds < 3600:  # Check if duration is less than 1 hour
-        formatted_duration = duration.format("m [minute]s and s [second]s")
-    else:
-        formatted_duration = duration.format("H [hour]s and m [minute]s")
-    return formatted_duration
 
 hourly_players = []
         
@@ -101,7 +97,7 @@ async def timer(seconds, switch_group):
     except asyncio.CancelledError:
         print("Timer cancelled")
 
-async def handleSwitch(command, args):
+async def handleSwitch(command, args:list[str]):
     switch_group = command
     switch_state = bool((await rust_socket.get_entity_info(paired_switches[switch_group][0])).value)
     if args:
@@ -159,81 +155,16 @@ def reconnectToServer():
     print("Lost Connection")
     raise ConnectionError
 
-async def hours_to_seconds(currenttime:str):
-    hours, minutes = currenttime.split(':')
-    return (int(hours) * 3600 + int(minutes) * 60)
-
 async def codeTest():
     print("a")
     print((await rust_socket.get_info()).size)
     for x in [x for x in (await rust_socket.get_team_info()).members if x.is_alive]:
-        grid = rustplus.convert_xy_to_grid((x.x, x.y), (await rust_socket.get_info()).size)
+        grid = rustplus.convert_xy_to_grid((x.x, x.y), (await rust_socket.get_info()).size, False)
         print(grid)
         await asyncio.sleep(1)
 
 async def pairingNotification(notification):
     pass
-
-class Event:
-    def __init__(self, type:int):
-        self.type = type
-        self.previous_active = False
-        self.active = False
-        self.last_seen = None
-        self.marker = None
-        self.marker:rustplus.RustMarker
-
-class EventTracker:
-    def __init__(self):
-        self.type_to_name = {
-            1:"Player",
-            2:"Explosion",
-            3:"Vending Machine",
-            4:"CH47",
-            5:"Cargo Ship",
-            6:"Crate",
-            7:"GenericRadius",
-            8:"Patrol Helicopter"
-        }
-
-        self.monitored_events = [4, 5, 8]
-
-        self.event_dict = {type:Event(type) for type in self.type_to_name.keys()}
-
-
-    async def updateEvents(self):
-        current_events = (await rust_socket.get_current_events())
-
-        for event in self.event_dict.values():
-            event.previous_active = event.active
-            event.active = False
-
-        for marker in current_events:
-            if marker.type in self.monitored_events:
-                self.event_dict[marker.type].active = True
-                self.event_dict[marker.type].last_seen = timing.time()
-                self.event_dict[marker.type].marker = marker
-        
-        for event in self.event_dict.values():
-            if event.active == event.previous_active:
-                continue
-
-            if event.active == True:
-                await send_message(f"{self.type_to_name[event.type]} has entered the map @{rustplus.convert_xy_to_grid((event.marker.x, event.marker.y))}.")
-
-            elif event.active == False and event.type != 8:
-                await send_message(f"{self.type_to_name[event.type]} has left the map.")
-
-            else:
-                if event.type == 8:
-                    await send_message(f"Patrol Helicoper was taken down @{rustplus.convert_xy_to_grid((event.marker.x, event.marker.y))}")                        
-    
-
-    async def lastSeen(self, event_type):
-        if event_type in self.event_dict.keys() and self.event_dict[event_type].last_seen:
-            await send_message(f"{self.type_to_name[event_type]} was last seen {await format_seconds(timing.time-self.event_dict[event_type].last_seen)} ago.")
-        else:
-            await send_message(f"{self.type_to_name[event_type]} has not yet been seen.")
         
 
 async def main():
@@ -242,8 +173,6 @@ async def main():
     fcm_listener = MyFCMListener(fcm_details)
     fcm_listener.start()
     await rust_socket.connect(retries=10000)
-    timing.sleep(1)
-    event_tracker = EventTracker()
     team_list = {team_member.steam_id:Player( (team_member.x, team_member.y), team_member.steam_id, team_member.name, team_member.is_online) for team_member in (await rust_socket.get_team_info()).members}
 
     notif = None
@@ -255,10 +184,11 @@ async def main():
     paired_switches = (await load_saved_switches())
 
     print("Connected.")
+    event_tracker = EventTracker(rust_socket)
+
     last_message = None
     while True:
-
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.5)
 
         if update_timer >= 120:
             #await update_players()
@@ -270,21 +200,19 @@ async def main():
             await event_tracker.updateEvents()
 
         if notif and ignore_notif == False:
-            print("a")
             if notif["data"]["channelId"] == "pairing":
-                print("if")
                 await start_pairing(notif)
             else:
                 print(notif["data"]["channelId"])
-                print("else")
             notif = None
         
-        message = (await rust_socket.get_team_chat())[-1].message
+        team_chat = (await rust_socket.get_team_chat())[-1]
+        message = team_chat.message
         if message == last_message:
             continue
         last_message = message
 
-        print(message)
+        print(f"{team_chat.time} {team_chat.name}: {message}")
         
         if message[0] == prefix and len(message) > 1:
             command = message[1:].split()[0]
@@ -307,6 +235,7 @@ async def heli(command:Command):
 
 @rust_socket.command
 async def afk(command:Command):
+    member:Player
     sentAFK = False
     for steam_id, member in team_list.items():
         if member.AFKstatus == True:
@@ -359,7 +288,7 @@ async def pair1(command:Command):
         if len(args) != 1:
             await send_message(f"Usage: !pair (label)")
             return
-        
+
         await send_message(f"Paired switch as \"{args[0]}\". You can now turn this switch on/off by using \"!{args[0]}\"")
         #paired_switches[args[0]] = ent_id
         try:
@@ -459,10 +388,11 @@ async def promote(command:Command):
 
 loop = asyncio.get_event_loop()
 while True:
-    # try:
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
 
-    # except Exception as e:
-    #     print(e)
-    #     timing.sleep(20)
-    #     continue
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+        timing.sleep(20)
+        continue
